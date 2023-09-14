@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>My Homepage</title>
+    <style>
+        html {
+            color-scheme: light dark;
+        }
+
+        body {
+            width: 35em;
+            margin: 0 auto;
+            font-family: Tahoma, Verdana, Arial, Noto Sans CJK SC, sans-serif;
+        }
+
+        .title-with-edit-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .input-with-button {
+            display: flex;
+            justify-content: space-between;
+            margin: 1ex 0 1ex 0;
+        }
+
+        .input-with-button>input {
+            flex: 1;
+        }
+
+        #markdown-edit-area {
+            width: 100%;
+            padding: 0;
+        }
+
+        #markdown-edit-area>textarea {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            min-height: 100ex;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>My Homepage</h1>
+
+    <div id="hitokoto"></div>
+
+    <hr />
+
+    <div class="box">
+        <h2>搜索</h2>
+        <div class="input-with-button">
+            <input id="searchbox" type="text" autofocus>
+            <button id="search">搜索</button>
+        </div>
+        <div>
+            <span>
+                <input type="radio" id="bing" name="engine" value="bing" checked onchange="chosen_engine = 'bing'" />
+                <label for="bing">Bing</label>
+            </span>
+
+            <span>
+                <input type="radio" id="google" name="engine" value="google" onchange="chosen_engine = 'google'" />
+                <label for="google">Google</label>
+            </span>
+
+            <span>
+                <input type="radio" id="baidu" name="engine" value="baidu" onchange="chosen_engine = 'baidu'" />
+                <label for="baidu">Baidu</label>
+            </span>
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="title-with-edit-button">
+            <h2>杂项</h2>
+            <button id="edit">编辑</button>
+        </div>
+
+        <div id="markdown-area">
+            <p>你好</p>、
+            <p>你好</p>
+        </div>
+
+        <div id="markdown-edit-area" hidden>
+            <textarea id="markdown-edit"></textarea>
+            <button hidden id="edit-complete">完成</button>
+        </div>
+    </div>
+
+
+</body>
+<script src="marked.min.js"></script>
+<script>
+    let edit_button = document.getElementById('edit');
+    let edit_complete_button = document.getElementById('edit-complete');
+    let search_button = document.getElementById('search');
+    let search_input = document.getElementById('searchbox')
+
+    let markdown_area = document.getElementById('markdown-area');
+    let markdown_edit_area = document.getElementById('markdown-edit-area');
+    let markdown_edit = document.getElementById('markdown-edit');
+
+    let hitokoto = document.getElementById('hitokoto');
+
+    var markdown_content = "";
+    var editable = false;
+    var editing = false;
+
+    var chosen_engine = 'bing';
+    const baseurls = {
+        'bing': 'https://cn.bing.com/search?q=',
+        'google': 'https://www.google.com/search?q=',
+        'baidu': 'https://www.baidu.com/s?wd=',
+    }
+
+    function go_search() {
+        let q = search_input.value;
+        window.open(baseurls[chosen_engine] + q);
+        search_input.value = "";
+    }
+
+    search_button.onclick = function(e) {
+        go_search();
+    }
+
+    search_input.addEventListener("keydown", function(e) {
+        if (e.code == 'Enter') {
+            go_search();
+        }
+    });
+
+    edit_button.onclick = function(e) {
+        if (editable == false) {
+            editable = true;
+            markdown_area.toggleAttribute('hidden', true);
+            markdown_edit_area.toggleAttribute('hidden', false);
+        } else {
+            editable = false;
+            editing = false;
+            markdown_content = markdown_edit.value;
+            upload_content();
+            markdown_area.toggleAttribute('hidden', false);
+            markdown_edit_area.toggleAttribute('hidden', true);
+            render_and_update_content();
+        }
+    }
+
+    markdown_area.onclick = function(e) {
+        if (!editable || editing) {
+            return false;
+        }
+        editing = true;
+    }
+
+    function upload_content() {
+        fetch('/update', {
+            method: 'PUT',
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                'content': markdown_content,
+            }),
+        })
+        .catch(err => {
+            console.log(err);
+            alert('更新失败')
+        })
+    }
+
+    function get_content() {
+        fetch('/markdown')
+        .then(resp => resp.json())
+        .then(resp => {
+            markdown_content = resp['content'];
+            markdown_edit.value = markdown_content;
+            render_and_update_content();
+        })
+        .catch((err) => {
+            console.log(err);
+            alert('无法加载markdown');
+        })
+    }
+
+    function render_and_update_content() {
+        rendered = marked.parse(markdown_content);
+        markdown_area.innerHTML = rendered;
+    }
+
+    fetch('https://v1.hitokoto.cn/?c=i')
+    .then(resp => resp.json())
+    .then(htkt => {
+        text = htkt['hitokoto'];
+        from = htkt['from'];
+        from_who = htkt['from_who'];
+
+        content = '"' + text + '"' + '  ——' + '《' + from + '》';
+        if (from_who != null) {
+            content = content + ', ' + from_who;
+        }
+        hitokoto.textContent = content;
+    })
+    .catch(err => {
+        console.log(err);
+    })
+
+    get_content();
+
+</script>
+
+</html>
